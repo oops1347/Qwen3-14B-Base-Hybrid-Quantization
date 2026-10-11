@@ -1,7 +1,14 @@
-"""INT4 group quantization and the paper's activation-only alpha search.
-
+"""Uses INT4 group quantization and the paper's activation-only alpha search.
+The matrix multiplcation will be W4A16.
 W is [output, input]; X is [token, input]. No gradients are used.
-This is a transparent research implementation, not a fused AWQ inference kernel.
+How the algorithm works:
+1. Rank input columns that contirbutes to particularly large output magnitudes 
+as potential outlier features. By excluding some of them from INT4 quntization, 
+AWQ can provide a smaller quantization range, which reduces quantization error.
+2. Measure the alpha values for each of the outlier criteria, and take the best alpha value
+that minimizes the quantization error.
+3. Dequantize the INT4 matrix and the maltmul with the activation and then add 
+the results of the FP16 matrix multiplication before preceeding to the next layer.
 """
 from dataclasses import dataclass
 import math
@@ -28,14 +35,16 @@ class SearchConfig:
         if not 0 <= self.min_relative_improvement < 1:
             raise ValueError("min_relative_improvement must be in [0, 1)")
 
-
+#packing to save space as we know all the numbers are in the range of 0-15
+#q is the matrix of the quantized weights.
+#have to do this cause torch.int4 is not fully supported yet.
 def pack_int4(q):
     if q.ndim != 2 or q.shape[1] % 2:
         raise ValueError("Packing requires an even, padded input dimension")
     q = q.to(torch.uint8)
     return q[:, 0::2] | (q[:, 1::2] << 4)
 
-
+#unpacking back to the original shape
 def unpack_int4(packed):
     return torch.stack((packed & 15, packed >> 4), dim=-1).flatten(-2)
 

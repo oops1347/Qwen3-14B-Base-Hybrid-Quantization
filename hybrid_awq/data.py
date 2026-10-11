@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 
-
+#A generator that yields strings from a text source, supports txt, jsonl, and json files
 def read_texts(source, field='text', seed=42, cache_dir=None, offline=False):
     if source is not None:
         path = Path(source)
@@ -16,6 +16,7 @@ def read_texts(source, field='text', seed=42, cache_dir=None, offline=False):
             if not isinstance(records, list):
                 raise ValueError("JSON calibration data must be a list of text strings or objects")
             for row in records:
+                #check whether the row is a string or a dictionary
                 yield row if isinstance(row, str) else row[field]
         else:
             with path.open(encoding='utf-8-sig') as stream:
@@ -29,6 +30,7 @@ def read_texts(source, field='text', seed=42, cache_dir=None, offline=False):
                         yield line.strip()
         return
     from datasets import DownloadConfig, load_dataset
+    #Pile validation is the default validation dataset
     dataset = load_dataset('mit-han-lab/pile-val-backup', split='validation',
                            cache_dir=cache_dir,
                            download_config=DownloadConfig(local_files_only=offline))
@@ -46,7 +48,7 @@ def build_blocks(tokenizer, calib_source=None, eval_source=None, *, samples=128,
     seen = set()
     document_counts = {key: 0 for key in limits}
     documents = {key: [] for key in limits}
-
+    #Check text uniqueness and add to the pool if not seen before and if the pool is not full.
     def add(text, split):
         if not isinstance(text, str) or not text.strip():
             return
@@ -62,12 +64,14 @@ def build_blocks(tokenizer, calib_source=None, eval_source=None, *, samples=128,
         if tokenizer.eos_token_id is not None:
             ids.append(tokenizer.eos_token_id)
         pools[split].extend(ids[:limits[split] - len(pools[split])])
+        #record how much token contribute to each split
         document_counts[split] += 1
         documents[split].append(digest)
 
     sources = [(calib_source, 'calibration'), (eval_source, 'evaluation')] if eval_source else [(calib_source, None)]
     for source, fixed_split in sources:
         for number, text in enumerate(read_texts(source, field, seed, cache_dir, offline)):
+            #if evaluation dataset is not provided, 20% of the calibration dataset will be used for evaluation, otherwise all text will be used for calibration
             split = fixed_split or ('evaluation' if number % 5 == 0 else 'calibration')
             add(text, split)
             if fixed_split:
