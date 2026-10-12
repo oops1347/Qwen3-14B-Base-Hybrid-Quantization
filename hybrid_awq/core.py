@@ -21,11 +21,13 @@ from torch.nn import functional as F
 @dataclass
 class SearchConfig:
     group_size: int = 128
-    grid_size: int = 20
-    candidate_pool: int = 8
-    max_outlier_fraction: float = 0.001
-    min_relative_improvement: float = 1e-4
-    loss_chunk: int = 128
+    grid_size: int = 20 #number of alpha values to search over
+    candidate_pool: int = 8 #maximum number of candidate columns to consider for exclusion
+    max_outlier_fraction: float = 0.001 #maximum fraction of columns to exclude from INT4 quantization
+    #accepted candidate must improve the MSE by at least min_relative_improvement compared to the current best MSE 
+    min_relative_improvement: float = 1e-4 
+    #number of tokens to process at once when computing the reconstruction loss, generally equal to the group size
+    loss_chunk: int = 128 
 
     def __post_init__(self):
         if self.group_size < 1 or self.grid_size < 1 or self.candidate_pool < 1 or self.loss_chunk < 1:
@@ -50,6 +52,7 @@ def unpack_int4(packed):
 
 
 @torch.no_grad()
+#quantize groups of the weight matrix to int4 while excluding the outliers.
 def quantize_groups(weight, group_size, excluded=None):
     """Zero-inclusive affine INT4; excluded columns do not set group extrema.
 
