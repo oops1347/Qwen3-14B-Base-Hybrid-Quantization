@@ -76,6 +76,7 @@ def quantize_groups(weight, group_size, excluded=None):
     zero = (-lo / delta).round().clamp(0, 15)
     q = (w / delta.unsqueeze(-1) + zero.unsqueeze(-1)).round().clamp(0, 15)
     q = torch.where(valid, q, zero.unsqueeze(-1)).to(torch.uint8)
+    #cut all the paddings and dequantize the weights.
     recovered = ((q.float() - zero.unsqueeze(-1)) * delta.unsqueeze(-1)).reshape(rows, width)[:, :cols]
     return recovered, q.reshape(rows, width), delta, zero.to(torch.uint8)
 
