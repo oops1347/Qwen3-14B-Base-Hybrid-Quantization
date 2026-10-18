@@ -20,7 +20,7 @@ from torch.nn import functional as F
 
 @dataclass
 class SearchConfig:
-    group_size: int = 128
+    group_size: int = 128 #number of elements in each quantization group
     grid_size: int = 20 #number of alpha values to search over
     candidate_pool: int = 8 #maximum number of candidate columns to consider for exclusion
     max_outlier_fraction: float = 0.001 #maximum fraction of columns to exclude from INT4 quantization
@@ -138,11 +138,11 @@ def search_alpha(weight, x, act_mean, config, excluded=None):
 
 
 @torch.no_grad()
-def output_hit_counts(y, multiplier):
+def output_hit_counts(output, multiplier):
     """Relative output magnitude, not Dettmers' absolute activation threshold."""
-    y = y.float()
-    rms = y.square().mean(-1, keepdim=True).sqrt()
-    return (y.abs() > multiplier * rms.clamp_min(1e-12)).sum(0)
+    output = output.float()
+    rms = output.square().mean(-1, keepdim=True).sqrt()
+    return (output.abs() > multiplier * rms.clamp_min(1e-12)).sum(0)
 
 
 def persistent_outputs(stats, multipliers, token_fraction=0.06, layer_fraction=0.25):
