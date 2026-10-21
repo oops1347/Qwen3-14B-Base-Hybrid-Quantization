@@ -1,6 +1,6 @@
 # Output-guided hybrid AWQ experiment
 
-`train.py` is the main entry point for **Qwen/Qwen3-14B-Base**. This research
+`run-experiment.py` is the main entry point for **Qwen/Qwen3-14B-Base**. This research
 experiment compares the original floating model, a paper-style AWQ scaling
 baseline, and a hybrid that preserves selected **input weight columns in FP16**.
 All remaining targeted weights use **INT4, group size 128** by default.
@@ -91,7 +91,7 @@ CUDA-compatible PyTorch build. Tested here with PyTorch 2.14.0 and Transformers
 conda activate qwen-quant
 python -m pip install -r requirements.txt
 python -m pytest -q
-python train.py --help
+python run-experiment.py --help
 ```
 
 Model loading defaults to `local_files_only=True`, using the normal HF cache or
@@ -103,7 +103,7 @@ network access. The code does not embed access tokens.
 ## 1. Calibrate and fit
 
 ```bash
-python train.py calibrate --output outputs/qwen14b-v1
+python run-experiment.py calibrate --output outputs/qwen14b-v1
 ```
 
 The default text source is `mit-han-lab/pile-val-backup`, validation split,
@@ -126,7 +126,7 @@ for final claims.
 For your own data:
 
 ```bash
-python train.py calibrate --calib-data my_calibration.jsonl --eval-data my_evaluation.jsonl --output outputs/custom-v1
+python run-experiment.py calibrate --calib-data my_calibration.jsonl --eval-data my_evaluation.jsonl --output outputs/custom-v1
 ```
 
 Supported: TXT with one document per nonblank line; JSONL with `{"text":"..."}`
@@ -139,7 +139,7 @@ Fitting can be expensive: it evaluates every alpha and candidate on each
 projection. For a smaller **pilot** (not a final accuracy claim):
 
 ```bash
-python train.py calibrate --calib-samples 8 --eval-samples 4 --search-tokens 128 --validation-tokens 64 --candidate-pool 4 --multipliers 6 --output outputs/pilot
+python run-experiment.py calibrate --calib-samples 8 --eval-samples 4 --search-tokens 128 --validation-tokens 64 --candidate-pool 4 --multipliers 6 --output outputs/pilot
 ```
 
 Each experiment contains token blocks/hashes, checkpoint fingerprint, sampled
@@ -152,7 +152,7 @@ variants share baseline files. Original checkpoint files are never changed.
 If fitting was interrupted **after** the survey completed, restart it:
 
 ```bash
-python train.py fit --artifact outputs/qwen14b-v1
+python run-experiment.py fit --artifact outputs/qwen14b-v1
 ```
 
 This redoes fitting from the saved survey using the recorded search configuration;
@@ -162,7 +162,7 @@ all projections are finished. A partial run cannot be evaluated as complete.
 ## 2. Compare accuracy
 
 ```bash
-python train.py compare --artifact outputs/qwen14b-v1 --backend fake
+python run-experiment.py compare --artifact outputs/qwen14b-v1 --backend fake
 ```
 
 This runs original, AWQ, and all saved hybrid variants in separate processes,
@@ -181,7 +181,7 @@ For actual separate-path numerical effects (different FP16 accumulation order),
 also evaluate the packed implementation:
 
 ```bash
-python train.py compare --artifact outputs/qwen14b-v1 --backend packed
+python run-experiment.py compare --artifact outputs/qwen14b-v1 --backend packed
 ```
 
 You can run one variant with `evaluate --variant original`, `--variant awq`, or
@@ -194,7 +194,7 @@ exponential is capped at exp(700) only to avoid overflow in degenerate models.
 ## 3. Measure memory and speed
 
 ```bash
-python train.py benchmark-all --artifact outputs/qwen14b-v1 --backend packed
+python run-experiment.py benchmark-all --artifact outputs/qwen14b-v1 --backend packed
 ```
 
 Each variant gets a fresh process, warmup, CUDA synchronization, and allocator
@@ -225,8 +225,8 @@ reports actual bytes rather than assuming ideal removal of packed slots.
 Use the new floating checkpoint and new calibration data in a **new directory**:
 
 ```bash
-python train.py calibrate --model /path/to/finetuned-checkpoint --calib-data new_train.jsonl --eval-data new_eval.jsonl --output outputs/finetuned-v2
-python train.py compare --model /path/to/finetuned-checkpoint --artifact outputs/finetuned-v2 --backend fake
+python run-experiment.py calibrate --model /path/to/finetuned-checkpoint --calib-data new_train.jsonl --eval-data new_eval.jsonl --output outputs/finetuned-v2
+python run-experiment.py compare --model /path/to/finetuned-checkpoint --artifact outputs/finetuned-v2 --backend fake
 ```
 
 This recomputes outputs, persistence masks, candidate attribution, retained FP16
@@ -237,7 +237,7 @@ the hybrid model itself is not a fine-tuning implementation.
 ## Offline smoke test
 
 ```bash
-python train.py smoke --output outputs/smoke
+python run-experiment.py smoke --output outputs/smoke
 ```
 
 Creates a tiny random two-block Qwen3 with grouped-query attention, Q/K norms,
